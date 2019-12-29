@@ -20,7 +20,9 @@
                 <div class="form-group">
                     <select class="form-control" name="tagtype" id="edittagtype">
                         <option value="0">Tag Dược Sĩ</option>
-                        <option value="1">Tag Khách Hàng</option>
+                        <option value="1">Tag Khách không chất lượng</option>
+                        <option value="2">Tag Khách Hàng</option>
+                        <option value="3">Tag Gửi tin nhắn</option>
                     </select>
                 </div>
             </form>

@@ -44,6 +44,14 @@
           </a>
         </li>
         <li>
+          <a href="{{route('report_customer.admin')}}">
+            <i class="fa fa-th"></i> <span>Thống kê Khách hàng</span>
+            <!-- <span class="pull-right-container">
+              <small class="label pull-right bg-green">new</small>
+            </span> -->
+          </a>
+        </li>
+        <li>
           <a href="{{route('send_messages.admin')}}">
             <i class="fa fa-envelope"></i> <span>Gửi tin nhắn</span>
             <!-- <span class="pull-right-container">

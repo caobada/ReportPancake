@@ -15,7 +15,7 @@
     <section class="content">
         <div class="box">
             <div class="box-header">
-                <h3 class="box-title">Danh sách Tag</h3>
+                <h3 class="box-title">Send Messages</h3>
 
             </div>
             <div class="container">
@@ -23,11 +23,13 @@
                     <div class="col-md-9">
                         <form >
                         <div class="form-group">
-                            <label>Tùy chọn gửi: </label>
-                            <select class="form-control" name="option-send" id="option-send">
-                                <option value="">--Chọn--</option>
-                                <option value="1">Gửi tất cả</option>
-                                <option value="1">Gửi theo danh sách</option>
+                            <label>Tùy chọn tags gửi: </label>
+                            <select class="form-control" name="option-send" id="option-send" name="tags[]" multiple="multiple">
+                                <option disabled="disabled">--Chọn--</option>
+                       
+                                @foreach($tags as $val)
+                                <option value="{{$val->id}}">{{$val->name_tag}}</option>
+                                @endforeach
                             </select>
                             <small>Gửi tất cả các người dùng có thời gian tương tác với fanpage không quá 24h  </small  >   
                         </div>
@@ -45,4 +47,9 @@
             </div>
         </div>
     </section>
+    <input type="hidden" value="{{csrf_token()}}" id="token">
+@endsection
+
+@section('script')
+    <script src="{{asset('build/admin/send_messages.js')}}"></script>
 @endsection

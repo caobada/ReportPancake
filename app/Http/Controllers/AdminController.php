@@ -6,9 +6,11 @@ use Illuminate\Http\Request;
 use App\Model\TagsList;
 use Illuminate\Support\Facades\DB; 
 use App\Model\Customer;
+use App\Model;
 use Validator;
 use App\Model\Shift;
 use Carbon\Carbon;
+use App\Jobs\ReportCustomerJob;
 class AdminController extends Controller
 {
     //
@@ -222,114 +224,294 @@ class AdminController extends Controller
         }
         $shift = Shift::find($request->shift);
         $staff = TagsList::where('type',0)->get();
+        $tag_list_bad = TagsList::where('type',1)->pluck('id_tag')->toArray();
         $from_time = $date.' '. $shift->timestart;
         $to_time = $date.' '.$shift->timeend;
-        $to_time = Carbon::parse($to_time)->subSeconds(1)->format('Y-m-d H:i:s');
-        $customer = Customer::whereBetween('updated_at',[$from_time,$to_time])->get();
-        $customer_of_staff = [];
-        foreach($staff as $val){
-            $staff = $val->id_tag;
-            $list_customer = [];
-            $list_customer_boolean = [];
-            foreach($customer as $v){
-                if(strpos($v->id_tags, '-') !== false) {
-                    $id_tags = explode('-',$v->id_tags);
-                } else {
-                    $id_tags = (array)$v->id_tags;
-                }
-                if(in_array($staff,$id_tags)){
-                    array_push($list_customer,['id'=>$v->id,'uuid' => $v->uuid]);
-                    array_push($list_customer_boolean,$v->id);
-                }
-            }
-            foreach($list_customer as $v){
-                $customer_tmp = Customer::where('uuid',$v['uuid'])->orderBy('id','asc')->get();
-                if(count($customer_tmp) > 1){
-                    for($i= count($customer_tmp)- 1;$i>=0;$i--){
-                        if($i != 0){
-                            $data[$customer_tmp[$i]['id']] = $customer_tmp[$i]['count_message'] - $customer_tmp[$i-1]['count_message'];
-                        }else{
-                            $data[$customer_tmp[$i]['id']] = $customer_tmp[$i]['count_message'];
-                        }
-                    }
-                    $find_key = max($data);
-                    $boolean_key = array_search($find_key,$data);
-                    if(in_array($boolean_key,$list_customer_boolean) === false){
-                        unset($list_customer_boolean[array_search($v['id'],$list_customer_boolean)]);
-                        $list_customer_boolean = array_values($list_customer_boolean);
-                    }
-                }
-            }
-            $customer_of_staff[$val->name_tag] = $list_customer_boolean;
-        }
-
-        // get được id của từng dược sĩ
-        $data = [];
-        foreach($customer_of_staff as $key => $value){
-
-            $tag_list_bad = TagsList::where('type',1)->pluck('id_tag')->toArray();
-            $customer_bad = [];
-            
-            foreach($value as $val){
-         
-                $customer = Customer::where('id',$val)->first();
-       
-                if(strpos($customer->id_tags, '-') !== false) {
-                    $id_tags = explode('-',$customer->id_tags);
-                } else {
-                    $id_tags = (array)$customer->id_tags;
-                }
-                $have_bad_tag = false;
-                foreach($id_tags as $v){
-                    if(in_array($v,$tag_list_bad)){
-                        $have_bad_tag = true;
-                    }
-                }
-                if($have_bad_tag === false){
-                    $check_next_customer = Customer::where('uuid',$customer->uuid)
-                    ->where('id','>',$customer->id)->first();
-                    if($check_next_customer){
-                        if(strpos($check_next_customer->id_tags, '-') !== false) {
-                            $id_tags = explode('-',$check_next_customer->id_tags);
+        $to_time = Carbon::parse($to_time)->subSeconds(1)->subMinutes(10)->format('Y-m-d H:i:s');
+   
+        $data_total = [];
+        $total_all_cus_staff = 0;
+        $total_all_bad = 0;
+        $total_all_cus_a_staff = 0;
+        foreach($staff as $value){
+            $customer = Customer::whereBetween('updated_at',[$from_time,$to_time])
+            ->where('type',0)
+            ->where('id_tags',$value->id_tag)
+            ->get();
+            $i_bad = 0;
+            $data[$value->name_tag] = [];
+            // TỔng số khách mỗi DS
+          
+            if(count($customer) > 0){
+                foreach($customer as $val){
+                     $customer_tmp = Customer::where('uuid',$val['uuid'])
+                    ->where('id','>',$val->id)
+                    ->where('type',1)
+                    ->first();
+                    if($customer_tmp){
+                        // lay Khach trong DB
+                        $tags = $customer_tmp['id_tags'];
+                        if(strpos($tags, '-') !== false) {
+                            $id_tags = explode('-',$tags);
                         } else {
-                            $id_tags = (array)$check_next_customer->id_tags;
+                            $id_tags = (array)$tags;
                         }
-                        $check_next_bad = false;
                         foreach($id_tags as $v){
                             if(in_array($v,$tag_list_bad)){
-                                $check_next_bad = true;
+                                $i_bad++; 
+                                break;
                             }
                         }
-                        if($check_next_bad){
-                            $customer_bad[] = $val;
-                        }
+                        
                     }else{
-                        $url_customer = self::GetInfoCustomer($customer->uuid,$customer->page_id);
-                        if($url_customer != false){
-                            $id_tags = json_decode($url_customer)->tags;
-                            $check_next_bad = false;
-                            foreach($id_tags as $v){
-                                if(in_array($v,$tag_list_bad)){
-                                    $check_next_bad = true;
-                                }
-                            }
-                            if($check_next_bad){
-                                $customer_bad[] = $val;
+                        // lay khach tren URL
+                        $url_cus =  self::GetInfoCustomer($val->uuid,$val->page_id);
+                        $id_tags = json_decode($url_cus)->tags;
+                        foreach($id_tags as $v){
+                            if(in_array($v,$tag_list_bad)){
+                                $i_bad++; 
+                                break;
                             }
                         }
                     }
-                } 
+                }
             }
-            $total_customer = count($value);
-            $total_customer_bad = count($customer_bad);
-            $total_gub = $total_customer - $total_customer_bad ;
-            array_push($data,['name'=>$key,'count'=>$total_customer,'count_bad'=>$total_customer_bad,'gub'=>$total_gub]);
+            $data[$value->name_tag] = ['total' => count($customer),'cus_bad'=>$i_bad,'cus_total'=>count($customer) - $i_bad];
+            $total_all_cus_staff += count($customer);
+            $total_all_bad += $i_bad;
+            $total_all_cus_a_staff += (count($customer) - $i_bad);
         }
+        $data['total'] = ['total_cus'=>$total_all_cus_staff,'total_bad' => $total_all_bad,'total'=>$total_all_cus_a_staff];
+   
+
+
+
+
+        // $customer = Customer::whereBetween('updated_at',[$from_time,$to_time])
+        // ->where('type',0)
+        // ->get();
+        // return $customer;
+        // $customer_of_staff = [];
+        // foreach($staff as $val){
+        //     $staff = $val->id_tag;
+        //     $list_customer = [];
+        //     $list_customer_boolean = [];
+        //     foreach($customer as $v){
+        //         if(strpos($v->id_tags, '-') !== false) {
+        //             $id_tags = explode('-',$v->id_tags);
+        //         } else {
+        //             $id_tags = (array)$v->id_tags;
+        //         }
+        //         if(in_array($staff,$id_tags)){
+        //             array_push($list_customer,['id'=>$v->id,'uuid' => $v->uuid]);
+        //             array_push($list_customer_boolean,$v->id);
+        //         }
+        //     }
+          
+        //     foreach($list_customer as $v){
+        //         $customer_tmp = Customer::where('uuid',$v['uuid'])->orderBy('id','asc')->get();
+          
+        //         if(count($customer_tmp) > 1){
+        //             for($i= count($customer_tmp)- 1;$i>=0;$i--){
+        //                 if($i != 0){
+        //                     $data[$customer_tmp[$i]['id']] = $customer_tmp[$i]['count_message'] - $customer_tmp[$i-1]['count_message'];
+        //                 }else{
+        //                     $data[$customer_tmp[$i]['id']] = $customer_tmp[$i]['count_message'];
+        //                 }
+        //             }
+        //             return $data;
+        //             $find_key = max($data);
+        //             $boolean_key = array_search($find_key,$data);
+        //             if(in_array($boolean_key,$list_customer_boolean) === false){
+        //                 unset($list_customer_boolean[array_search($v['id'],$list_customer_boolean)]);
+        //                 $list_customer_boolean = array_values($list_customer_boolean);
+        //             }
+        //         }
+        //     }
+        //     $customer_of_staff[$val->name_tag] = $list_customer_boolean;
+        // }
+        // return $customer_of_staff;
+        // get được id của từng dược sĩ
+        // $data = [];
+        // foreach($customer_of_staff as $key => $value){
+
+        //     $tag_list_bad = TagsList::where('type',1)->pluck('id_tag')->toArray();
+        //     $customer_bad = [];
+            
+        //     foreach($value as $val){
+         
+        //         $customer = Customer::where('id',$val)->first();
+       
+        //         if(strpos($customer->id_tags, '-') !== false) {
+        //             $id_tags = explode('-',$customer->id_tags);
+        //         } else {
+        //             $id_tags = (array)$customer->id_tags;
+        //         }
+        //         $have_bad_tag = false;
+        //         foreach($id_tags as $v){
+        //             if(in_array($v,$tag_list_bad)){
+        //                 $have_bad_tag = true;
+        //             }
+        //         }
+        //         if($have_bad_tag === false){
+        //             $check_next_customer = Customer::where('uuid',$customer->uuid)
+        //             ->where('id','>',$customer->id)->first();
+        //             if($check_next_customer){
+        //                 if(strpos($check_next_customer->id_tags, '-') !== false) {
+        //                     $id_tags = explode('-',$check_next_customer->id_tags);
+        //                 } else {
+        //                     $id_tags = (array)$check_next_customer->id_tags;
+        //                 }
+        //                 $check_next_bad = false;
+        //                 foreach($id_tags as $v){
+        //                     if(in_array($v,$tag_list_bad)){
+        //                         $check_next_bad = true;
+        //                     }
+        //                 }
+        //                 if($check_next_bad){
+        //                     $customer_bad[] = $val;
+        //                 }
+        //             }else{
+        //                 $url_customer = self::GetInfoCustomer($customer->uuid,$customer->page_id);
+        //                 if($url_customer != false){
+        //                     $id_tags = json_decode($url_customer)->tags;
+        //                     $check_next_bad = false;
+        //                     foreach($id_tags as $v){
+        //                         if(in_array($v,$tag_list_bad)){
+        //                             $check_next_bad = true;
+        //                         }
+        //                     }
+        //                     if($check_next_bad){
+        //                         $customer_bad[] = $val;
+        //                     }
+        //                 }
+        //             }
+        //         } 
+        //     }
+        //     $total_customer = count($value);
+        //     $total_customer_bad = count($customer_bad);
+        //     $total_gub = $total_customer - $total_customer_bad ;
+        //     array_push($data,['name'=>$key,'count'=>$total_customer,'count_bad'=>$total_customer_bad,'gub'=>$total_gub]);
+        // }
         return self::JsonExport(200,'success',$data);
     }
 
+    public function report_customer(){
+        return view('admin.pages.report_customer');
+    }
+
+    public function report_customer_ajax(Request $request){
+        $start = Carbon::parse($request->date)->startOfday();
+        $end = Carbon::parse($request->date)->endOfday();
+        $tag_customer = TagsList::where('type',2)->get();
+        foreach($tag_customer as $val){
+            $data[$val->name_tag] = 0;
+        }
+        
+      $time_start = microtime(true);
+       //  return $start.$end;
+       $customer = Customer::whereBetween('updated_at',[$start,$end])
+       ->select('uuid','id','page_id')
+       ->where('type',0)
+       ->get();
+       return self::JsonExport(200,'success',$customer);
+    }
+
+    public function report_customer_ajax_post(Request $request){
+        if(count($request->data) > 0){
+            $tag_customer = TagsList::where('type',2)->get();
+            foreach($tag_customer as $val){
+                $data[$val->name_tag] = 0;
+            }
+            foreach($request->data as $val){
+                $customer_check = Customer::where('uuid',$val['uuid'])
+                ->where('type',1)
+                ->where('id','>',$val['id'])
+                ->first();
+                if($customer_check){
+                    // tồn tại ở ca sau
+                     $tags = $customer_check->id_tags;
+                    if(strpos($tags, '-') !== false) {
+                        $id_tags = explode('-',$tags);
+                    } else {
+                        $id_tags = (array)$tags;
+                    }
+                    foreach($tag_customer as $k){
+                         foreach($id_tags as $v){
+                             if($k == $v){
+                                 $data[$k->name_tag]++;
+                             }
+                         }
+                    }
+                    
+                }else{
+                     // phải get từ URL
+                     $url_cus =  self::GetInfoCustomer($val['uuid'],$val['page_id']);
+                     $id_tags = json_decode($url_cus)->tags;
+                     foreach($tag_customer as $k){
+                         foreach($id_tags as $v){
+                             if($k->id_tag == $v){
+                                 $data[$k->name_tag]++;
+                             }
+                         }
+                     }
+                }
+            }
+            return $data;
+        }
+    }
+
     public function send_messages(){
-        $tag_list_customer = TagsList::where('type',1)->get();
+        $tag_list_customer = TagsList::where('type',3)->get();
         return view('admin.pages.send_messages',['tags'=>$tag_list_customer]);
+    }
+    
+    public function get_count_customer_ajax(Request $request){
+        if($request->has('tags')){
+            if(count($request->tags) > 0){
+                $time_interactive = 23; // hour
+                $about_time = Carbon::now()->subHours($time_interactive)->format('Y-m-d H:i:s');
+                $time = Carbon::now()->endOfday()->format('Y-m-d H:i:s');
+                $customer = Customer::where('updated_at','>',$about_time)
+                ->select()
+                ->groupBy('uuid')->get();
+                foreach($customer as $value){
+                    return $value->id_tags;
+                    foreach($request->tags as $val){
+
+                    }
+                }
+            }else{
+                return 0;
+            }
+        }else{
+            return 0;
+        }
+    }
+
+    public function refresh(){
+        $data = Model\ConfigAutoTag::first();
+        if(!empty($data->page_id)){
+            if(strpos($data->page_id, '|') !== false) {
+                $page_arr = explode('|',$data->page_id);               
+            } else{
+                $page_arr[] = $data->page_id; 
+            }
+            Model\TagsList::truncate();
+            foreach($page_arr as $value){
+                $data = json_decode(self::GetSettingPage($value));
+                $tags = $data->settings->tags;
+                foreach($tags as $val){
+                    $data = [
+                        'page_id' => $value,
+                        'name_tag' => $val->text,
+                        'id_tag' => $val->id,
+                        'type'=> 1
+                    ];
+                     Model\TagsList::create($data);
+                }
+            }
+        }
+        return 1;
     }
 }

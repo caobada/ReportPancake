@@ -22,9 +22,11 @@ class CreateTagsListTable extends Migration
         });
 
         Schema::create('config_auto_tag', function (Blueprint $table) {
+            $table->increments('id');
             $table->integer('position');
             $table->string('token');
             $table->string('page_id');
+            $table->timestamps();
         });
     }
 

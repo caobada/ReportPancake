@@ -7,6 +7,8 @@ use Illuminate\Routing\Controller as BaseController;
 use Illuminate\Foundation\Validation\ValidatesRequests;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Response;
+use App\Model;
+
 class Controller extends BaseController
 {
     use AuthorizesRequests, DispatchesJobs, ValidatesRequests;
@@ -32,5 +34,24 @@ class Controller extends BaseController
         $values = ($resp);
         curl_close($ch);
         return $values;
+    }
+
+    static function GetSettingPage($page_id){
+        $token = self::getToken();
+        
+       
+        $ch = curl_init();
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_URL => 'https://pages.fm/api/v1/pages/'.$page_id.'/settings?access_token='.$token
+        ]);
+        $resp = curl_exec($ch);
+        curl_close($ch);
+        return $resp;
+    }
+
+    static function getToken(){
+        $data = Model\ConfigAutoTag::first();
+        return $data->token;
     }
 }

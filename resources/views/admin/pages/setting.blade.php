@@ -41,7 +41,9 @@
                                         <td>{{$val->id_tag}}</td>
                                         <td>
                                             @if($val->type ==0) Tag Dược Sĩ
-                                            @else Tag Khách Hàng
+                                            @elseif($val->type == 1) Tag Khách không chất lượng
+                                            @elseif($val->type == 2) Tag Khách Hàng
+                                            @else Tag Gửi tin nhắn
                                             @endif
                                         </td>
                                         <td>
@@ -80,7 +82,9 @@
                             <div class="form-group">
                                 <select class="form-control" name="tagtype">
                                     <option value="0">Tag Dược Sĩ</option>
-                                    <option value="1">Tag Khách Hàng</option>
+                                    <option value="1">Tag không chất lượng</option>
+                                    <option value="2">Tag Khách Hàng</option>
+                                    <option value="3">Tag Gửi tin nhắn</option>
                                 </select>
                             </div>
                             <div class="form-group">

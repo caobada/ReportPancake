@@ -43,30 +43,43 @@ class AutoTag extends Command
     public function handle()
     {
         try{
+			
             $ds = [];
-            $data_tags = TagsList::where('type',0)->get();
-            foreach($data_tags as $val){
-                array_push($ds,$val->id_tag);
-            }
-            // for($j = 0;$j<=10;$j++){
-                // sleep(5);          
+            $ds = TagsList::where("name_tag","like","DS%")
+            ->groupBy("name_tag")
+            ->pluck("name_tag");
+            // ->get();
+            // echo json_encode($data_tags);exit;
+            // foreach($data_tags as $val){
+            //     array_push($ds,$val->id_tag);
+            // }
+            for($j = 0;$j<5;$j++){
+				if($j != 0){
+					 sleep(10); 
+				}
+                        
                 $i = self::getDS();
                 $values = self::getConversation();
 
                 if(isset($values->error_code)){
                     echo $values->message;exit;
                 }
+				if(isset($values->conversations)){
                 $cons = $values->conversations;
                 foreach($cons as $value){
                     if($i >= count($ds)){
                         $i = 0;
                     }
+                    echo $value->page_id;exit;
                     if(empty($value->tags)){
                         // action tag
-                        // $stt = self::autotag($value->page_id,$value->id,$ds[$i]);
-                        // if($stt->success){
-                        //     $i++;
-                        // }
+                      
+                         $stt = self::autotag($value->page_id,$value->id,$ds[$i],null);
+                         if($stt->success){
+				file_put_contents('/home/e996vsr7utbw/public_html/cron/logs/tags.log', "Thời gian tags: ".date('Y/m/d H:i:s')."  ---  Dược sĩ : ".$i."  type --- 0 \n", FILE_APPEND | LOCK_EX);
+				file_put_contents('/home/e996vsr7utbw/public_html/cron/logs/tags.log', "--------------------------------------------\n", FILE_APPEND | LOCK_EX);
+                             $i++;
+                         }
                         self::saveCustomer($value->id,$value->page_id,0,$value->message_count);
                     }else{
                         $tags = implode('-',$value->tags);
@@ -79,10 +92,12 @@ class AutoTag extends Command
                         }
                         if($tmp){
                         // action tag
-                        // $stt = self::autotag($value->page_id,$value->id,$ds[$i]);
-                        //     if($stt->success){
-                        //         $i++;
-                        //     }
+                         $stt = self::autotag($value->page_id,$value->id,$ds[$i],null);
+                             if($stt->success){
+				 file_put_contents('/home/e996vsr7utbw/public_html/cron/logs/tags.log', "Thời gian tags: ".date('Y/m/d H:i:s')."  ---  Dược sĩ : ".$i."  type -- 1  \n", FILE_APPEND | LOCK_EX);
+				file_put_contents('/home/e996vsr7utbw/public_html/cron/logs/tags.log', "--------------------------------------------\n", FILE_APPEND | LOCK_EX);
+                                 $i++;
+                             }
                         }
                     }
                 }
@@ -90,7 +105,10 @@ class AutoTag extends Command
                 if($result){
                     echo "Thành công!";
                 }
-            // }
+				}else{
+				echo "Không get được Conversation";
+				}
+            }
         }catch(Exception $ex){
             echo 'Caught exception: ',  $e->getMessage(), "\n";
         }
@@ -134,6 +152,9 @@ class AutoTag extends Command
             'tag_id'=> $ds,
             'value' => 1
         ];
+
+        $ch = curl_init();
+		
         if($token == null){
             $token = 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1aWQiOiIzOGVkMDZiNy1hMzM4LTQxZjAtYjcyZC0wMGE4MDExZTdjNmUiLCJpYXQiOjE1NjU4NDUzMTcsImZiX25hbWUiOiJDYW8gQmFkYSIsImZiX2lkIjoiNzIyMjY4NzY3OTEwOTkwIiwiZXhwIjoxNTczNjIxMzE3fQ.OrMnQa--TuY4OoZ_P5yeD3LJDZHQtP6zI9iDwbXt5do';
         }
@@ -194,11 +215,6 @@ class AutoTag extends Command
                     $commit = Customer::create($data);
                 }
             }
-        }
-        if(isset($commit)&& $commit){
-            echo 1;
-        }else{
-            echo 0;
         }
     }
 }

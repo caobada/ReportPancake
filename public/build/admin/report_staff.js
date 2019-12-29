@@ -25,13 +25,22 @@ $(function(){
                 if(ketqua.code == 401){
                     alert(ketqua.msg)
                 }else if(ketqua.code == 200){
+               
                     $.each(ketqua.data,function(k,v){
-                        $('#table_report_staff tbody').append('<tr>'+
-                        '<td>'+v.name+'</td>'
-                        +'<td>'+v.count+'</td>'
-                        +'<td>'+v.count_bad+'</td>'
-                        +'<td>'+v.gub+'</td>' 
-                        +'</tr>');
+                        if(k != 'total'){
+                            $('#table_report_staff tbody').append('<tr>'+
+                            '<td>'+k+'</td>'
+                            +'<td>'+v.total+'</td>'
+                            +'<td>'+v.cus_bad+'</td>'
+                            +'<td>'+v.cus_total+'</td>' 
+                            +'</tr>');
+                        }else{
+                            $('#total_cus').html(v.total_cus);
+                            $('#total_bad').html(v.total_bad);
+                            $('#total').html(v.total);
+                            
+                        }
+                       
                     });
                 }else{
                     alert('Server bị lỗi! VUi lòng thử lại vs mạng mạnh hơn!');

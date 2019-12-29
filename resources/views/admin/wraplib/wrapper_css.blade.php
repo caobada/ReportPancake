@@ -26,3 +26,5 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Source+Sans+Pro:300,400,600,700,300italic,400italic,600italic">
   <link rel="stylesheet" href="{{asset('bower_components\datatables.net-bs\css\datatables.min.css')}}">
   <link rel="stylesheet" href="{{asset('bower_components\lobibox\lobibox.css')}}">
+
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.10/css/select2.min.css" rel="stylesheet" />
